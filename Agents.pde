@@ -1,8 +1,8 @@
 int agentLimit = 20000;
 float sensorDistance = 6;
-int scentStrength = 40;
+int scentStrength = 20;
 int sensorSize = 1;
-int senseAngle = 10;
+float senseAngle = 2.2;
 ArrayList<Agent> agents;
 ArrayList<FloatList> trailMap;
 int turnStrength = 50;
@@ -11,6 +11,7 @@ boolean speedChanged = false;
 int fadeRate = 100; 
 int numThreads = 20;
 float decayRate = .95;
+boolean flipTrailMapProcessing = false;
 
 void setup() {
   size(640, 360);
@@ -35,9 +36,9 @@ void draw() {
       agentSpeed -= 0.25;
       speedChanged = true;
     } else if (key == 'a') {
-      turnStrength += 5;
+      turnStrength += 2;
     } else if (key == 's') {
-      turnStrength -= 5;  
+      turnStrength -= 2;  
     } else if (key == 'z') {
       scentStrength += 10;
     } else if (key == 'x') {
@@ -54,6 +55,16 @@ void draw() {
       numThreads += 1;
     } else if (key == 'p') {
       numThreads -= 1;  
+    } else if (key == 'd') {
+      sensorDistance += 1;
+      println("SensorDistance: " + sensorDistance);
+    } else if (key == 'f') {
+      sensorDistance -= 1;
+      println("SensorDistance: " + sensorDistance);
+    } else if (key == 't') {
+      sensorSize += 1;
+    } else if (key == 'y') {
+      sensorSize -= 1;  
     } 
     
   } 
@@ -61,6 +72,7 @@ void draw() {
   fill(c);
   rect(0,0,width,height);
   stroke(color(255));
+  
   
   int agentsPerThread = agents.size() / numThreads;
   ArrayList<Thread> threads = new ArrayList<Thread>();
@@ -81,8 +93,9 @@ void draw() {
   
   //processAgents();
   processTrailMap();
-  drawAgents(); //<>//
+  drawAgents();
   //saveFrame();
+  println(senseAngle);
 }
 
 void setupAgents() {
@@ -94,11 +107,11 @@ void setupAgents() {
     float x = random(width/4, (width/4)*3);
     //float y = random(0, height);
     //float x = random(0, width);
-    float angle = atan2((centerY - y), (centerX - x));
-    if (angle < 0) {
-      angle += 360;  
-    }
-    //float angle = random(0, 360);
+    //float angle = atan2((centerY - y), (centerX - x));
+    //if (angle < 0) {
+    //  angle += 360;  
+    //}
+    float angle = x > width / 2 ? 180 : 0;
     Agent agent = new Agent(x, y, angle, agentSpeed);
     agents.add(agent);  
   }
@@ -127,8 +140,8 @@ void processAgents() {
       agent.angle = -agent.angle;  
     }
     float straight = agent.sense(0);
-    float left = agent.sense(-senseAngle);
-    float right = agent.sense(senseAngle);
+    float left = agent.sense(-HALF_PI/senseAngle);
+    float right = agent.sense(HALF_PI/senseAngle);
     if (straight > left && straight > right) {
       //Do Nothing
     } else if (left > right) {
@@ -149,6 +162,7 @@ void drawAgents() {
   for (int i = 0; i < agents.size(); i++) {
       Agent agent = agents.get(i);
       line(agent.oldX, agent.oldY, agent.x, agent.y);
+      //point(agent.x, agent.y);
   }
 }
 
@@ -156,7 +170,7 @@ void setupTrailMap() {
   trailMap = new ArrayList<FloatList>(height);
   for (int y = 0; y < height; y++) {
     FloatList row = new FloatList(width);
-    trailMap.add(row); //<>//
+    trailMap.add(row);
     for (int x = 0; x < width; x++) {
         row.set(x, 0);
     }
@@ -168,25 +182,26 @@ void processTrailMap() {
   for (int y = 0; y < height; y++) {
     FloatList row = trailMap.get(y);
     for (int x = 0; x < width; x++) {
-      //float currentVal = row.get(x);
-      //stroke(currentVal * 10);
-      //if (currentVal > 0) {
-        //point(x, y);
-      //}
+      int actualX = flipTrailMapProcessing ? width - 1 - x : x;
+      int actualY = flipTrailMapProcessing ? height - 1 - y : y;
       float sum = 0;
       int processed = 0;
       for (int xOffset = -1; xOffset <= 1; xOffset++) {
         for (int yOffset = -1; yOffset <= 1; yOffset++) {
-          if (x + xOffset < 0 || x + xOffset > width - 1 || y + yOffset < 0 || y + yOffset > height - 1) {
+          if (actualX + xOffset < 0 || actualX + xOffset > width - 1 || actualY + yOffset < 0 || actualY + yOffset > height - 1) {
             continue;
           }
-          sum += trailMap.get(y + yOffset).get(x + xOffset);
+          sum += trailMap.get(actualY + yOffset).get(actualX + xOffset);
           processed++;
         }
       }
-      row.set(x, max(0, sum / processed * decayRate));
+      float val = sum / processed * decayRate;
+      row.set(x, max(0, val));
+      //stroke(val * 10);
+      //point (x, y);
     }
   }
+  flipTrailMapProcessing = !flipTrailMapProcessing;
 }
 
 class Agent {

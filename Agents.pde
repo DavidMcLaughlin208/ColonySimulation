@@ -1,19 +1,20 @@
-int agentLimit = 50000;
+int agentLimit = 20000;
 float sensorDistance = 6;
 int scentStrength = 40;
 int sensorSize = 1;
 int senseAngle = 10;
 ArrayList<Agent> agents;
-ArrayList<IntList> trailMap;
+ArrayList<FloatList> trailMap;
 int turnStrength = 50;
-float agentSpeed = 6.0;
+float agentSpeed = 8.0;
 boolean speedChanged = false;
 int fadeRate = 100; 
 int numThreads = 20;
+float decayRate = .95;
 
 void setup() {
-  //size(640, 360);
-  fullScreen();
+  size(640, 360);
+  //fullScreen();
   background(0);
   noStroke();
   fill(0, 102);
@@ -93,11 +94,11 @@ void setupAgents() {
     float x = random(width/4, (width/4)*3);
     //float y = random(0, height);
     //float x = random(0, width);
-    //float angle = atan2((centerY - y), (centerX - x));
-    //if (angle < 0) {
-    //  angle += 360;  
-    //}
-    float angle = random(0, 360);
+    float angle = atan2((centerY - y), (centerX - x));
+    if (angle < 0) {
+      angle += 360;  
+    }
+    //float angle = random(0, 360);
     Agent agent = new Agent(x, y, angle, agentSpeed);
     agents.add(agent);  
   }
@@ -112,7 +113,7 @@ void processAgents() {
     float oldX = agent.x;
     float oldY = agent.y;
     if (!(agent.x < 0 || agent.x > width - 1 || agent.y < 0 || agent.y > height -1)) {
-      int currentVal = trailMap.get(int(agent.y)).get(int(agent.x));
+      float currentVal = trailMap.get(int(agent.y)).get(int(agent.x));
       trailMap.get(int(agent.y)).set(int(agent.x), currentVal + scentStrength);  
     }
     float newX = agent.x + cos(degrees(agent.angle)) * agent.speed;
@@ -152,9 +153,9 @@ void drawAgents() {
 }
 
 void setupTrailMap() {
-  trailMap = new ArrayList<IntList>(height);
+  trailMap = new ArrayList<FloatList>(height);
   for (int y = 0; y < height; y++) {
-    IntList row = new IntList(width);
+    FloatList row = new FloatList(width);
     trailMap.add(row); //<>//
     for (int x = 0; x < width; x++) {
         row.set(x, 0);
@@ -165,14 +166,25 @@ void setupTrailMap() {
 void processTrailMap() {
   stroke(255);
   for (int y = 0; y < height; y++) {
-    IntList row = trailMap.get(y);
+    FloatList row = trailMap.get(y);
     for (int x = 0; x < width; x++) {
-      int currentVal = row.get(x);
+      //float currentVal = row.get(x);
       //stroke(currentVal * 10);
       //if (currentVal > 0) {
         //point(x, y);
       //}
-      row.set(x, max(0, currentVal - 1));
+      float sum = 0;
+      int processed = 0;
+      for (int xOffset = -1; xOffset <= 1; xOffset++) {
+        for (int yOffset = -1; yOffset <= 1; yOffset++) {
+          if (x + xOffset < 0 || x + xOffset > width - 1 || y + yOffset < 0 || y + yOffset > height - 1) {
+            continue;
+          }
+          sum += trailMap.get(y + yOffset).get(x + xOffset);
+          processed++;
+        }
+      }
+      row.set(x, max(0, sum / processed * decayRate));
     }
   }
 }
@@ -241,7 +253,7 @@ public class AgentProcessor implements Runnable {
     agent.oldX = agent.x;
     agent.oldY = agent.y;
     if (!(agent.x < 0 || agent.x > width - 1 || agent.y < 0 || agent.y > height -1)) {
-      int currentVal = trailMap.get(int(agent.y)).get(int(agent.x));
+      float currentVal = trailMap.get(int(agent.y)).get(int(agent.x));
       trailMap.get(int(agent.y)).set(int(agent.x), currentVal + scentStrength);  
     }
     float newX = agent.x + cos(degrees(agent.angle)) * agent.speed;
@@ -259,10 +271,12 @@ public class AgentProcessor implements Runnable {
     float right = agent.sense(senseAngle);
     if (straight > left && straight > right) {
       //Do Nothing
-    } else if (left > right) {
+    } else if (left > right && left > straight) {
       agent.angle += radians(-random(turnStrength, turnStrength + 10)/100);
-    } else if (right > left) {
+    } else if (right > left && right > straight) {
       agent.angle += radians(random(turnStrength, turnStrength + 10)/100);  
+    } else if (left > straight && right > straight) {
+        agent.angle += radians(random(-2, 2)/100);
     }
     //agent.angle += radians(random(-2, 2)/100);
     //stroke(color(min((left + right + straight)/2,200), (left + right + straight)/2, (left + right + straight)/2));

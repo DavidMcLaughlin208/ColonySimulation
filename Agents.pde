@@ -1,17 +1,18 @@
-int agentLimit = 20000;
-float sensorDistance = 6;
+int agentLimit = 30000;
+float sensorDistance = 9;
 int scentStrength = 20;
 int sensorSize = 1;
 float senseAngle = 2.2;
 ArrayList<Agent> agents;
 ArrayList<FloatList> trailMap;
 int turnStrength = 50;
-float agentSpeed = 8.0;
+float agentSpeed = 5.0;
 boolean speedChanged = false;
 int fadeRate = 100; 
 int numThreads = 20;
 float decayRate = .95;
 boolean flipTrailMapProcessing = false;
+float maxSpeedBoost = 5;
 
 void setup() {
   size(640, 360);
@@ -48,9 +49,9 @@ void draw() {
     } else if (key == 'r') {
       senseAngle -= 0.01;  
     } else if (key == 'c') {
-      fadeRate += 5;
+      maxSpeedBoost += 1;
     } else if (key == 'v') {
-      fadeRate -= 5;  
+      maxSpeedBoost -= 1;  
     } else if (key == 'o') {
       numThreads += 1;
     } else if (key == 'p') {
@@ -65,6 +66,12 @@ void draw() {
       sensorSize += 1;
     } else if (key == 'y') {
       sensorSize -= 1;  
+    } else if (key == 'g') {
+      decayRate += 0.01;
+      println(decayRate);
+    } else if (key == 'h') {
+      decayRate -= 0.01; 
+      println(decayRate);
     } 
     
   } 
@@ -95,7 +102,7 @@ void draw() {
   processTrailMap();
   drawAgents();
   //saveFrame();
-  println(senseAngle);
+  //println(senseAngle);
 }
 
 void setupAgents() {
@@ -211,6 +218,7 @@ class Agent {
   float speed;
   float oldX;
   float oldY;
+  float speedBoost;
   
   public Agent(float x, float y, float angle, float speed) {
     this.x = x;
@@ -219,6 +227,7 @@ class Agent {
     this.speed = speed; 
     this.oldX = x;
     this.oldY = y;
+    this.speedBoost = 0;
   }
   
   public float sense(float angleOffset) {
@@ -271,8 +280,8 @@ public class AgentProcessor implements Runnable {
       float currentVal = trailMap.get(int(agent.y)).get(int(agent.x));
       trailMap.get(int(agent.y)).set(int(agent.x), currentVal + scentStrength);  
     }
-    float newX = agent.x + cos(degrees(agent.angle)) * agent.speed;
-    float newY = agent.y + sin(degrees(agent.angle)) * agent.speed;
+    float newX = agent.x + cos(degrees(agent.angle)) * (agent.speed + agent.speedBoost);
+    float newY = agent.y + sin(degrees(agent.angle)) * (agent.speed + agent.speedBoost);
     agent.x = newX;
     agent.y = newY;
     if (agent.x < 0 || agent.x > width) {
@@ -284,6 +293,9 @@ public class AgentProcessor implements Runnable {
     float straight = agent.sense(0);
     float left = agent.sense(-senseAngle);
     float right = agent.sense(senseAngle);
+    if (straight > scentStrength * 4 || left > scentStrength * 4 || right > scentStrength * 4) {
+      agent.speedBoost = maxSpeedBoost;  
+    }
     if (straight > left && straight > right) {
       //Do Nothing
     } else if (left > right && left > straight) {
